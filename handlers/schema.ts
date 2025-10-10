@@ -10,7 +10,7 @@ const emptyPermissions = {
 function getBotDefinition(): BotDefinition {
   return {
     description:
-      "This bot demonstrates integration with OpenAI to create a chat bot",
+      "An intelligent AI agent powered by ElizaOS - capable of context-aware conversations, memory retention, and sophisticated reasoning",
     autonomous_config: {
       permissions: Permissions.encodePermissions({
         ...emptyPermissions,
@@ -32,7 +32,7 @@ function getBotDefinition(): BotDefinition {
       {
         name: "prompt",
         default_role: "Participant",
-        description: "Send a message to eliza",
+        description: "Send a message to the ElizaOS AI agent for intelligent responses",
         permissions: Permissions.encodePermissions({
           ...emptyPermissions,
           message: ["Text"],
@@ -43,8 +43,8 @@ function getBotDefinition(): BotDefinition {
           {
             name: "prompt",
             required: true,
-            description: "The prompt to send into the Agent",
-            placeholder: "How can I help you?",
+            description: "Your message to the ElizaOS AI agent",
+            placeholder: "Ask me anything...",
             param_type: {
               StringParam: {
                 min_length: 1,
