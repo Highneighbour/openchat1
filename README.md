@@ -1,248 +1,366 @@
-# ElizaOS OpenChat Bot
+# @elizaos/client-openchat
 
-An intelligent AI agent powered by [ElizaOS](https://github.com/ai16z/eliza) integrated with [OpenChat](https://oc.app) on the Internet Computer. This bot provides context-aware conversations with memory retention and sophisticated reasoning capabilities.
+> **OpenChat Client Plugin for ElizaOS** - Enable your AI agents to interact on the Internet Computer's OpenChat platform
+
+[![npm version](https://img.shields.io/npm/v/@elizaos/client-openchat.svg)](https://www.npmjs.com/package/@elizaos/client-openchat)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Overview
+
+This plugin enables [ElizaOS](https://github.com/ai16z/eliza) agents to connect to [OpenChat](https://oc.app), a decentralized messaging platform on the Internet Computer. Your AI agents can interact with users, maintain conversation context, and provide intelligent responses.
 
 ## Features
 
-- 🤖 **ElizaOS Integration**: Full ElizaOS agent with memory and context awareness
-- 💬 **OpenChat Compatible**: Seamlessly integrates with the OpenChat platform
-- 🧠 **Multiple AI Models**: Supports OpenAI, Anthropic, Google, and more
-- 📝 **Conversation Memory**: Maintains context across conversations
-- 🔒 **Secure**: Built with OpenChat's authentication and security features
-
-## Architecture
-
-This bot bridges OpenChat with ElizaOS:
-
-1. **OpenChat Frontend** → User sends message via `/prompt` command
-2. **Bot Server** → Receives message through OpenChat Bot API
-3. **ElizaOS Runtime** → Processes message with AI agent
-4. **Response** → Sends back intelligent response to OpenChat
-
-## Prerequisites
-
-- Node.js (v18 or higher)
-- npm or yarn
-- OpenChat Bot credentials
-- OpenAI API key (or other supported AI provider)
+- 🤖 **Full ElizaOS Integration** - Works seamlessly with ElizaOS agents
+- 💬 **OpenChat Native** - Built on OpenChat's official bot framework
+- 🧠 **Context-Aware** - Maintains conversation history and memory
+- 🔒 **Secure** - Uses OpenChat's JWT authentication
+- 🌐 **Decentralized** - Runs on Internet Computer blockchain
+- 🔌 **Plug & Play** - Easy installation via npm
 
 ## Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd openchat1
-   ```
+### Using ElizaOS CLI (Recommended)
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+When creating a new agent with the ElizaOS CLI:
 
-3. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+# Create a new agent
+elizaos create my-openchat-agent
 
-4. **Edit `.env` with your credentials**
-   - Add your OpenChat bot credentials (OC_PUBLIC, IDENTITY_PRIVATE, etc.)
-   - Add your OpenAI API key (or other AI provider)
-   - Configure model settings
+# When prompted for clients, select "openchat"
+# Or manually add to your character file
+```
 
-## Configuration
+### Manual Installation
 
-### OpenChat Configuration
+Add to your ElizaOS project:
 
-Get your OpenChat bot credentials from the [OpenChat platform](https://oc.app):
-- `OC_PUBLIC`: OpenChat public key
-- `IDENTITY_PRIVATE`: Your bot's identity private key
-- `STORAGE_INDEX_CANISTER`: Storage canister ID
-- `IC_HOST`: Internet Computer host (default: https://icp-api.io)
+```bash
+npm install @elizaos/client-openchat
+```
 
-### ElizaOS Configuration
+Or with pnpm:
 
-Configure your AI agent in `eliza-config.json`:
-- **name**: Bot's name
-- **bio**: Bot's biography and capabilities
-- **style**: Conversation style and behavior
-- **topics**: Topics the bot can discuss
-- **settings**: Model settings (temperature, max tokens, etc.)
+```bash
+pnpm add @elizaos/client-openchat
+```
 
-### AI Model Configuration
+## Quick Start
 
-Set your AI provider in `.env`:
+### 1. Register Your Bot on OpenChat
 
-**OpenAI (default)**:
+1. Visit [OpenChat](https://oc.app)
+2. Register your bot and get credentials:
+   - `OPENCHAT_PUBLIC_KEY`
+   - `OPENCHAT_IDENTITY_PRIVATE`
+   - `OPENCHAT_STORAGE_CANISTER`
+
+### 2. Configure Environment Variables
+
+Create or update your `.env` file:
+
 ```env
+# OpenChat Configuration
+OPENCHAT_PUBLIC_KEY=your_openchat_public_key
+OPENCHAT_IDENTITY_PRIVATE=your_identity_private_key
+OPENCHAT_STORAGE_CANISTER=your_storage_canister_id
+OPENCHAT_IC_HOST=https://icp-api.io
+OPENCHAT_PORT=3000
+
+# AI Provider (at least one required)
+OPENAI_API_KEY=your_openai_api_key
 MODEL_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-AI_MODEL=gpt-4
 ```
 
-**Anthropic (Claude)**:
-```env
-MODEL_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-AI_MODEL=claude-3-opus-20240229
+### 3. Add to Your Character Configuration
+
+In your `character.json`:
+
+```json
+{
+  "name": "YourAgent",
+  "bio": ["Your agent's bio"],
+  "modelProvider": "openai",
+  "clients": ["openchat"],
+  "plugins": []
+}
 ```
 
-**Google (Gemini)**:
-```env
-MODEL_PROVIDER=google
-GOOGLE_GENERATIVE_AI_API_KEY=...
-AI_MODEL=gemini-pro
-```
-
-## Running the Bot
-
-### Development Mode
+### 4. Run Your Agent
 
 ```bash
-npm run dev
+elizaos start
 ```
 
-### Production Mode
-
-```bash
-npm run build
-npm start
-```
-
-The bot will start on port 3000 (or your configured PORT).
+Your agent will:
+- Start an HTTP server for OpenChat webhooks
+- Register the `/prompt` command
+- Begin responding to messages on OpenChat
 
 ## Usage
 
-Once the bot is running and registered with OpenChat:
+### In OpenChat
+
+Once your agent is running and registered:
 
 1. Find your bot on OpenChat
-2. Start a conversation or add it to a group
-3. Use the `/prompt` command followed by your message:
-   ```
-   /prompt Hello! How are you?
-   ```
+2. Add it to a group or DM
+3. Use the `/prompt` command:
+
+```
+/prompt Hello! How are you?
+```
 
 The bot will:
 - Show a "Thinking..." placeholder
 - Process your message through ElizaOS
 - Return an intelligent, context-aware response
 
+### Programmatic Usage
+
+You can also use this client programmatically:
+
+```typescript
+import { OpenChatClient } from "@elizaos/client-openchat";
+import { AgentRuntime } from "@ai16z/eliza";
+
+// Create client
+const client = new OpenChatClient({
+  openchatPublicKey: process.env.OPENCHAT_PUBLIC_KEY!,
+  icHost: process.env.OPENCHAT_IC_HOST!,
+  identityPrivateKey: process.env.OPENCHAT_IDENTITY_PRIVATE!,
+  openStorageCanisterId: process.env.OPENCHAT_STORAGE_CANISTER!,
+  port: 3000,
+});
+
+// Start with your runtime
+await client.start(runtime);
+```
+
+## Configuration
+
+### Client Configuration Options
+
+```typescript
+interface OpenChatConfig {
+  /** OpenChat public key (required) */
+  openchatPublicKey: string;
+  
+  /** Internet Computer host URL (default: https://icp-api.io) */
+  icHost?: string;
+  
+  /** Bot identity private key (required) */
+  identityPrivateKey: string;
+  
+  /** OpenStorage canister ID (required) */
+  openStorageCanisterId: string;
+  
+  /** Server port (default: 3000) */
+  port?: number;
+  
+  /** Enable debug logging (default: false) */
+  debug?: boolean;
+}
+```
+
+### Environment Variables
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `OPENCHAT_PUBLIC_KEY` | OpenChat bot public key | Yes | - |
+| `OPENCHAT_IDENTITY_PRIVATE` | Bot identity private key | Yes | - |
+| `OPENCHAT_STORAGE_CANISTER` | Storage canister ID | Yes | - |
+| `OPENCHAT_IC_HOST` | Internet Computer host | No | `https://icp-api.io` |
+| `OPENCHAT_PORT` | Server port | No | `3000` |
+
 ## API Endpoints
 
-- `GET /`: Bot definition schema
-- `GET /bot_definition`: Bot definition schema (same as above)
-- `POST /execute_command`: Execute bot commands (used by OpenChat)
+The client automatically sets up these endpoints:
 
-## Project Structure
+### `GET /` or `GET /bot_definition`
 
-```
-.
-├── handlers/
-│   ├── executeCommand.ts  # Command routing
-│   ├── prompt.ts          # Main ElizaOS integration
-│   ├── schema.ts          # Bot definition
-│   └── success.ts         # Response helper
-├── middleware/
-│   └── botclient.ts       # OpenChat authentication
-├── eliza-runtime.ts       # ElizaOS agent management
-├── eliza-config.json      # Agent character configuration
-├── app.ts                 # Express app setup
-├── server.ts              # Server entry point
-├── factory.ts             # OpenChat client factory
-└── types.ts               # TypeScript types
+Returns the bot definition for OpenChat registration.
+
+**Response:**
+```json
+{
+  "description": "Agent description",
+  "commands": [...],
+  "autonomous_config": {...}
+}
 ```
 
-## How It Works
+### `POST /execute_command`
+
+Handles OpenChat command execution (called by OpenChat platform).
+
+**Headers:**
+- `x-oc-jwt`: OpenChat authentication token
+
+### `GET /health`
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "client": "openchat"
+}
+```
+
+## Architecture
+
+```
+┌─────────────────┐
+│  OpenChat User  │
+└────────┬────────┘
+         │ /prompt command
+         ↓
+┌─────────────────┐
+│ OpenChat (ICP)  │
+└────────┬────────┘
+         │ HTTP POST + JWT
+         ↓
+┌─────────────────┐
+│ Your Agent      │
+│ + OpenChat      │
+│   Client        │
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│ ElizaOS Runtime │
+│ + AI Model      │
+└─────────────────┘
+```
 
 ### Message Flow
 
-1. **User sends message** via OpenChat `/prompt` command
-2. **OpenChat authenticates** request with JWT token
-3. **Bot extracts** user info and message content
-4. **ElizaOS processes** message with:
-   - Context from previous conversations
-   - Character personality and knowledge
-   - AI model inference
-5. **Response sent** back to OpenChat
-6. **Memory stored** for future context
+1. User sends `/prompt message` in OpenChat
+2. OpenChat platform calls your bot's `/execute_command` endpoint
+3. Client authenticates request and extracts message
+4. Message is processed through ElizaOS runtime:
+   - User and room state is ensured in database
+   - Message is stored in conversation memory
+   - Context is composed from conversation history
+   - AI model generates response
+   - Response is stored in memory
+5. Response is sent back to OpenChat
+6. User sees the response
 
-### ElizaOS Integration
+## Examples
 
-The `eliza-runtime.ts` module:
-- Initializes ElizaOS agent on first request
-- Manages conversation memory with SQLite
-- Processes messages through the AI agent
-- Maintains context across conversations
-- Handles user and room identification
-
-## Customization
-
-### Modify Agent Personality
-
-Edit `eliza-config.json` to customize:
-- Bot's personality and behavior
-- Knowledge domains and topics
-- Conversation style
-- Example interactions
-
-### Add Custom Actions
-
-Extend `eliza-runtime.ts` to add:
-- Custom ElizaOS actions
-- Additional plugins
-- Custom evaluators
-- External integrations
-
-## Troubleshooting
-
-### Bot not responding
-- Check that all environment variables are set correctly
-- Verify OpenAI API key is valid
-- Check server logs for errors
-
-### Memory issues
-- Ensure `./data` directory exists and is writable
-- Check SQLite database permissions
-
-### OpenChat integration issues
-- Verify OpenChat credentials
-- Check that bot is properly registered on OpenChat
-- Ensure server is accessible from OpenChat
+See the [`examples/`](./examples) directory for:
+- `character.json` - Example agent configuration
 
 ## Development
 
-### Build TypeScript
+### Building from Source
+
 ```bash
+# Clone the repository
+git clone https://github.com/your-org/client-openchat
+cd client-openchat
+
+# Install dependencies
+npm install
+
+# Build
 npm run build
+
+# Watch mode for development
+npm run dev
 ```
 
-### Run tests
+### Testing
+
 ```bash
 npm test
 ```
 
+### Publishing
+
+```bash
+# Bump version
+npm version patch|minor|major
+
+# Publish to npm
+npm publish
+```
+
+## Troubleshooting
+
+### Bot not responding
+
+**Check environment variables:**
+```bash
+# Verify all required variables are set
+echo $OPENCHAT_PUBLIC_KEY
+echo $OPENCHAT_IDENTITY_PRIVATE
+echo $OPENCHAT_STORAGE_CANISTER
+```
+
+**Check logs:**
+```bash
+# ElizaOS logs will show connection status
+elizaos start --log-level debug
+```
+
+**Verify bot registration:**
+```bash
+# Test the bot definition endpoint
+curl http://localhost:3000/bot_definition
+```
+
+### Connection errors
+
+- Ensure your server is publicly accessible (OpenChat needs to reach your endpoints)
+- Check firewall rules allow traffic on the configured port
+- Verify `OPENCHAT_IC_HOST` is correct
+- Test Internet Computer connectivity
+
+### Authentication errors
+
+- Verify `OPENCHAT_PUBLIC_KEY` matches your bot registration
+- Check `OPENCHAT_IDENTITY_PRIVATE` is correctly formatted
+- Ensure credentials haven't expired
+
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please:
 
-## License
-
-MIT
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## Resources
 
-- [ElizaOS Documentation](https://docs.elizaos.ai/)
-- [OpenChat Bot Documentation](https://github.com/open-chat-labs/open-chat-bots)
-- [OpenChat Platform](https://oc.app)
-- [Internet Computer](https://internetcomputer.org/)
+- **ElizaOS**: https://github.com/ai16z/eliza
+- **ElizaOS Docs**: https://docs.elizaos.ai/
+- **OpenChat**: https://oc.app
+- **OpenChat Bot Framework**: https://github.com/open-chat-labs/open-chat-bots
+- **Internet Computer**: https://internetcomputer.org/
 
 ## Support
 
-For issues and questions:
-- ElizaOS: [ElizaOS GitHub](https://github.com/ai16z/eliza)
-- OpenChat: [OpenChat GitHub](https://github.com/open-chat-labs)
+- **Issues**: [GitHub Issues](https://github.com/your-org/client-openchat/issues)
+- **ElizaOS Discord**: [Join Discord](https://discord.gg/ai16z)
+- **OpenChat Community**: [OpenChat](https://oc.app)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details
 
 ## Acknowledgments
 
-- Built with [ElizaOS](https://github.com/ai16z/eliza)
+- Built for [ElizaOS](https://github.com/ai16z/eliza)
 - Powered by [OpenChat](https://oc.app)
 - Running on [Internet Computer](https://internetcomputer.org/)
+
+---
+
+**Made with ❤️ for the ElizaOS and OpenChat communities**

@@ -1,45 +1,62 @@
 {
-  "name": "eliza-openchat-bot",
-  "version": "1.0.0",
-  "description": "An intelligent AI agent powered by ElizaOS integrated with OpenChat",
-  "main": "dist/server.js",
+  "name": "@elizaos/client-openchat",
+  "version": "0.1.0",
+  "description": "OpenChat client plugin for ElizaOS - enables AI agents on Internet Computer's OpenChat platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "tsx server.ts",
-    "watch": "nodemon --exec tsx server.ts",
+    "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "rebuild": "npm run clean && npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [
     "eliza",
     "elizaos",
     "openchat",
     "ai",
+    "agent",
     "bot",
-    "internet-computer"
+    "internet-computer",
+    "icp",
+    "client",
+    "plugin"
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/client-openchat"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/client-openchat/issues"
+  },
+  "homepage": "https://github.com/your-org/client-openchat#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@ai16z/eliza": "^0.1.6"
+  },
   "dependencies": {
-    "@ai16z/adapter-sqlite": "^0.1.6",
-    "@ai16z/eliza": "^0.1.6",
     "@open-ic/openchat-botclient-ts": "^1.0.61",
-    "@types/better-sqlite3": "^7.6.13",
-    "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@ai16z/eliza": "^0.1.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.7.1",
     "@types/uuid": "^10.0.0",
-    "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
