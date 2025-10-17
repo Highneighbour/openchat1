@@ -1,0 +1,27 @@
+# Source files
+src/
+examples/
+
+# Config files
+tsconfig.json
+.env.example
+
+# Documentation (keep README)
+INTEGRATION_GUIDE.md
+CHANGELOG.md
+
+# Development files
+.gitignore
+.npmignore
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
