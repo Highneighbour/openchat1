@@ -8,7 +8,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "start:bot": "node dist/standalone-server.js",
+    "start:bot:dev": "ts-node src/standalone-server.ts"
   },
   "keywords": [
     "eliza",
