@@ -1,0 +1,84 @@
+{
+  "name": "@elizaos/plugin-openchat",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@elizaos/core": "^1.6.2",
+    "@open-ic/openchat-botclient-ts": "^1.0.61",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.10",
+    "prettier": "3.5.3",
+    "tsup": "8.4.0",
+    "typescript": "^5.8.3",
+    "vitest": "1.6.1"
+  },
+  "scripts": {
+    "build": "tsup && tsc",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "prettier --write ./src",
+    "clean": "rm -rf dist .turbo node_modules .turbo-tsconfig.json tsconfig.tsbuildinfo",
+    "format": "prettier --write ./src",
+    "format:check": "prettier --check ./src"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "OPENCHAT_PUBLIC_KEY": {
+        "type": "string",
+        "description": "OpenChat public key for verifying JWT tokens",
+        "required": true,
+        "sensitive": false
+      },
+      "OPENCHAT_IC_HOST": {
+        "type": "string",
+        "description": "Internet Computer host URL (e.g., https://ic0.app)",
+        "required": true,
+        "sensitive": false
+      },
+      "OPENCHAT_IDENTITY_PRIVATE_KEY": {
+        "type": "string",
+        "description": "Private key (PEM format) for bot identity",
+        "required": true,
+        "sensitive": true
+      },
+      "OPENCHAT_STORAGE_INDEX_CANISTER": {
+        "type": "string",
+        "description": "OpenStorage canister ID for storage index",
+        "required": true,
+        "sensitive": false
+      },
+      "OPENCHAT_BOT_PORT": {
+        "type": "string",
+        "description": "Port for OpenChat bot server (default: 3000)",
+        "required": false,
+        "sensitive": false
+      }
+    }
+  }
+}
