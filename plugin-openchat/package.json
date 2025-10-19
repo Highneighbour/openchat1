@@ -1,0 +1,37 @@
+{
+  "name": "@eliza/plugin-openchat",
+  "version": "0.1.0",
+  "description": "OpenChat plugin for Eliza OS - enables AI agents to interact with OpenChat (oc.app)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo 'Tests coming soon'",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "eliza",
+    "plugin",
+    "openchat",
+    "icp",
+    "internet-computer",
+    "ai-agent"
+  ],
+  "dependencies": {
+    "@open-ic/openchat-botclient-ts": "^1.0.61",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "@eliza/core": "*"
+  }
+}
