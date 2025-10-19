@@ -1,0 +1,50 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+
+# Development files
+tsconfig.json
+.eslintrc*
+.prettierrc*
+jest.config.*
+*.test.ts
+*.spec.ts
+__tests__/
+test/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+*.tsbuildinfo
+
+# Private keys
+*.pem
+private_key.pem
