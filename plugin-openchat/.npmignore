@@ -1,0 +1,10 @@
+src/
+tsconfig.json
+.env
+.env.example
+*.log
+*.pem
+node_modules/
+coverage/
+.nyc_output/
+.DS_Store

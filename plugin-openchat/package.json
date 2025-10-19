@@ -1,0 +1,55 @@
+{
+  "name": "@elizaos/plugin-openchat",
+  "version": "1.0.0",
+  "description": "OpenChat integration plugin for ElizaOS agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "packageType": "plugin",
+  "platform": "node",
+  "license": "MIT",
+  "author": "ElizaOS Contributors",
+  "keywords": [
+    "plugin",
+    "elizaos",
+    "openchat",
+    "ic",
+    "internet-computer"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@elizaos/core": "workspace:*",
+    "@open-ic/openchat-botclient-ts": "^1.0.61",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "@elizaos/core": "*"
+  }
+}
