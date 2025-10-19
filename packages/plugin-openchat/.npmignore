@@ -1,0 +1,29 @@
+# Source files
+src/
+examples/
+*.test.ts
+*.test.js
+
+# Configuration
+tsconfig.json
+tsup.config.ts
+.prettierrc
+.gitignore
+
+# Documentation (keep README)
+TESTING.md
+QUICKSTART.md
+
+# Development
+.env
+.env.example
+*.pem
+private_key*
+
+# IDE
+.vscode/
+.idea/
+
+# Tests
+coverage/
+.nyc_output
