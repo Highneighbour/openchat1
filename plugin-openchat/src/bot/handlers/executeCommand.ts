@@ -1,8 +1,7 @@
 import { commandNotFound, argumentsInvalid } from "@open-ic/openchat-botclient-ts";
 import { Request, Response } from "express";
 import { WithBotClient } from "../../types/index.js";
-import { IAgentRuntime, Content, UUID } from "@elizaos/core";
-import { v4 as uuidv4 } from "uuid";
+import { IAgentRuntime } from "@elizaos/core";
 
 /**
  * Type guard to check if request has BotClient
@@ -39,7 +38,6 @@ async function handleChatCommand(
     if (message === undefined) {
         runtime.logger?.debug("[OpenChat] No message argument provided");
         const msg = (await client.createTextMessage("Please provide a message.")).setFinalised(true);
-        runtime.logger?.debug("[OpenChat] Sending error message to backend...");
         await client.sendMessage(msg);
         return;
     }
@@ -47,53 +45,80 @@ async function handleChatCommand(
     runtime.logger?.debug("[OpenChat] Processing message:", message);
 
     try {
-        // Get or create room ID from scope
-        const scope = (client as any).scope;
-        const chatId = (scope as any).chatId || scope.chat_id || "unknown";
-        const roomId = `openchat-${scope.kind}-${chatId}` as UUID;
-
-        // Get user ID (sender)
-        const userId = ((client as any).userId || (client as any).user_id || "unknown") as UUID;
-
-        // Generate a simple response using character info
+        // Generate response using ElizaOS
         const character = runtime.character;
-        let responseText = `Hello! I'm ${character.name}. `;
         
-        // Simple response logic
-        if (message.toLowerCase().includes("hello") || message.toLowerCase().includes("hi")) {
-            responseText += "How can I help you today?";
-        } else if (message.toLowerCase().includes("help")) {
-            responseText += "I'm here to assist you! You can ask me questions or just chat.";
-        } else {
-            responseText += `You said: "${message}". I'm here to help! What would you like to know?`;
+        // Build prompt for the AI
+        const prompt = `You are ${character.name}. ${character.bio?.[0] || ""}
+
+${character.style?.all?.join(", ") || "Be helpful and friendly."}
+
+User: ${message}
+
+${character.name}:`;
+
+        let responseText: string;
+        
+        try {
+            // Try different runtime methods to generate response
+            if (typeof (runtime as any).generateText === 'function') {
+                responseText = await (runtime as any).generateText({
+                    prompt,
+                    stop: ["\nUser:", `\n${character.name}:`],
+                    maxTokens: 200,
+                });
+            } else if (typeof (runtime as any).completion === 'function') {
+                responseText = await (runtime as any).completion({
+                    prompt,
+                    stop: ["\nUser:", `\n${character.name}:`],
+                });
+            } else if (typeof (runtime as any).generateResponse === 'function') {
+                const response = await (runtime as any).generateResponse({
+                    text: message,
+                    context: prompt,
+                });
+                responseText = response?.text || response;
+            } else {
+                // Last resort: use character postExamples or bio
+                const examples = character.postExamples || [];
+                responseText = examples.length > 0 
+                    ? examples[Math.floor(Math.random() * examples.length)]
+                    : `${character.bio?.[0] || "Hello! How can I help you?"}`;
+            }
+        } catch (genError: any) {
+            runtime.logger?.error("[OpenChat] Error generating response:", genError?.message || genError);
+            
+            // Fallback response
+            responseText = character.postExamples?.[ 0] 
+                || character.bio?.[0] 
+                || "I'm here to help! What would you like to know?";
         }
 
-        // Send final response (must be finalized)
-        runtime.logger?.debug("[OpenChat] Creating final message, text:", responseText.substring(0, 100));
+        responseText = responseText.trim();
+        
+        // Clean up response (remove any role prefixes)
+        responseText = responseText
+            .replace(new RegExp(`^${character.name}:\\s*`, 'i'), '')
+            .replace(/^Assistant:\s*/i, '')
+            .replace(/^AI:\s*/i, '')
+            .trim();
+        
+        runtime.logger?.debug("[OpenChat] Generated response:", responseText.substring(0, 100));
+
+        // Send final response to OpenChat
         const responseMsg = (await client.createTextMessage(responseText)).setFinalised(true);
+        await client.sendMessage(responseMsg);
+        runtime.logger?.debug("[OpenChat] ✅ Response sent successfully");
         
-        // Log the message structure before sending
-        const msgResponse = (responseMsg as any).toResponse ? (responseMsg as any).toResponse() : responseMsg;
-        runtime.logger?.debug("[OpenChat] Message to send:", JSON.stringify(msgResponse, null, 2));
-        
-        runtime.logger?.debug("[OpenChat] Calling client.sendMessage...");
-        try {
-            const result = await client.sendMessage(responseMsg);
-            runtime.logger?.debug("[OpenChat] ✅ Message sent successfully!", JSON.stringify(result, null, 2));
-        } catch (sendError: any) {
-            runtime.logger?.error("[OpenChat] ❌ sendMessage FAILED:", JSON.stringify(sendError, null, 2));
-            runtime.logger?.error("[OpenChat] Error details - kind:", sendError?.kind, "code:", sendError?.code, "message:", sendError?.message);
-            throw sendError;
-        }
     } catch (error: any) {
-        runtime.logger?.error("Error handling chat command:", error?.message || error);
+        runtime.logger?.error("[OpenChat] Error in chat handler:", error?.message || error);
         try {
             const errorMsg = (await client.createTextMessage(
                 "I encountered an error processing your message. Please try again."
             )).setFinalised(true);
             await client.sendMessage(errorMsg);
         } catch (sendError: any) {
-            runtime.logger?.error("Failed to send error message:", sendError);
+            runtime.logger?.error("[OpenChat] Failed to send error message:", sendError);
         }
     }
 }
@@ -178,7 +203,7 @@ export async function executeCommand(
     const client = req.botClient;
     const commandName = client.commandName;
 
-    runtime.logger.debug(`[OpenChat] Executing command: ${commandName}`);
+    runtime.logger?.debug(`[OpenChat] Executing command: ${commandName}`);
 
     try {
         switch (commandName) {
