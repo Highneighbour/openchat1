@@ -30,12 +30,9 @@ async function handleChatCommand(
 ): Promise<void> {
     const client = req.botClient;
     
-    // Send immediate placeholder
+    // Send immediate placeholder to frontend only (don't send to backend)
     const placeholder = (await client.createTextMessage("Thinking...")).setFinalised(false);
     res.status(200).json(success(placeholder));
-    
-    // Send placeholder to OpenChat backend
-    await client.sendMessage(placeholder);
 
     // Get message argument
     const message = client.stringArg("message");
