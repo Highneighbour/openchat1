@@ -2,7 +2,10 @@ import { commandNotFound } from "@open-ic/openchat-botclient-ts";
 import { Request, Response } from "express";
 import { WithBotClient } from "../../types/index.js";
 import { IAgentRuntime, Content, UUID, Memory } from "@elizaos/core";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
+
+// Namespace UUID for OpenChat rooms (deterministic)
+const OPENCHAT_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
 /**
  * Type guard to check if request has BotClient
@@ -43,13 +46,43 @@ async function handleChatCommand(
     }
     
     try {
-        // Get scope and user info
+        // Get scope and user info from client
         const scope = (client as any).scope;
-        const chatId = (scope as any).chatId || scope.chat_id || "unknown";
-        const roomId = `openchat-${scope.kind}-${chatId}` as UUID;
-        const userId = ((client as any).initiator || (client as any).userId || "user") as UUID;
+        const initiator = (client as any).initiator;
+        
+        runtime.logger?.debug("[OpenChat] Raw scope:", JSON.stringify(scope));
+        runtime.logger?.debug("[OpenChat] Raw initiator:", initiator);
+        
+        // Extract chat identifier - try multiple possible field names
+        let chatIdentifier = "";
+        if (scope) {
+            chatIdentifier = (scope as any).chatId 
+                || (scope as any).chat_id 
+                || (scope as any).groupId 
+                || (scope as any).channelId 
+                || "";
+            
+            // If chatId is an object or bigint, convert to string
+            if (typeof chatIdentifier === 'object' || typeof chatIdentifier === 'bigint') {
+                chatIdentifier = String(chatIdentifier);
+            }
+        }
+        
+        runtime.logger?.debug("[OpenChat] Extracted chatIdentifier:", chatIdentifier);
+        
+        // Create deterministic UUID for room based on OpenChat chat ID
+        // This ensures the same chat always gets the same roomId
+        const roomId = chatIdentifier && chatIdentifier !== ""
+            ? uuidv5(`openchat-${scope.kind}-${chatIdentifier}`, OPENCHAT_NAMESPACE) as UUID
+            : uuidv4() as UUID;
+        
+        // Create deterministic UUID for user
+        const userId = initiator && typeof initiator === 'string' && initiator.length > 0
+            ? uuidv5(`openchat-user-${initiator}`, OPENCHAT_NAMESPACE) as UUID
+            : uuidv4() as UUID;
 
-        runtime.logger?.debug("[OpenChat] Message from", userId, "in room", roomId);
+        runtime.logger?.debug("[OpenChat] Generated roomId (UUID):", roomId);
+        runtime.logger?.debug("[OpenChat] Generated userId (UUID):", userId);
 
         // Create proper content object for ElizaOS
         const content: Content = {
