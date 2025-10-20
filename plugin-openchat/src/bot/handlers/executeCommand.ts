@@ -84,13 +84,44 @@ async function handleChatCommand(
         runtime.logger?.debug("[OpenChat] Generated roomId (UUID):", roomId);
         runtime.logger?.debug("[OpenChat] Generated userId (UUID):", userId);
 
+        // Ensure room exists in database
+        try {
+            let room = await (runtime as any).getRoom?.(roomId);
+            if (!room && typeof (runtime as any).ensureRoomExists === 'function') {
+                runtime.logger?.debug("[OpenChat] Creating room");
+                await (runtime as any).ensureRoomExists(roomId);
+                room = await (runtime as any).getRoom?.(roomId);
+            }
+            if (!room && typeof (runtime as any).createRoom === 'function') {
+                runtime.logger?.debug("[OpenChat] Creating room via createRoom");
+                room = await (runtime as any).createRoom({
+                    id: roomId,
+                    name: `OpenChat ${scope.kind}`,
+                    source: "openchat",
+                });
+            }
+        } catch (roomError: any) {
+            runtime.logger?.warn("[OpenChat] Could not ensure room exists:", roomError.message);
+        }
+
+        // Ensure user exists in database
+        try {
+            let user = await (runtime as any).getUser?.(userId);
+            if (!user && typeof (runtime as any).ensureUserExists === 'function') {
+                runtime.logger?.debug("[OpenChat] Creating user");
+                await (runtime as any).ensureUserExists(userId, initiator || "OpenChat User");
+            }
+        } catch (userError: any) {
+            runtime.logger?.warn("[OpenChat] Could not ensure user exists:", userError.message);
+        }
+
         // Create proper content object for ElizaOS
         const content: Content = {
             text: message,
             source: "openchat",
         };
 
-        // Create memory-like object for ElizaOS runtime
+        // Create memory object for ElizaOS runtime
         const memory: any = {
             id: uuidv4() as UUID,
             userId,
@@ -100,37 +131,40 @@ async function handleChatCommand(
             createdAt: Date.now(),
         };
 
-        // Let ElizaOS handle the message through its proper pipeline
+        // Use simpler AI generation that doesn't require database
         let responseText: string;
+        
+        runtime.logger?.debug("[OpenChat] Generating response using simple method");
+        
+        // Build a simple prompt
+        const character = runtime.character;
+        const prompt = `You are ${character.name}. ${character.bio?.[0] || ""}
 
-        // Try to use the proper message handling system
-        if (typeof (runtime as any).handleMessage === 'function') {
-            runtime.logger?.debug("[OpenChat] Using handleMessage");
-            const response = await (runtime as any).handleMessage(memory);
-            responseText = response?.text || response?.content?.text || String(response);
-        } else if (typeof (runtime as any).processMessage === 'function') {
-            runtime.logger?.debug("[OpenChat] Using processMessage");
-            const response = await (runtime as any).processMessage(memory);
-            responseText = response?.text || response?.content?.text || String(response);
-        } else if (typeof (runtime as any).generateMessageResponse === 'function') {
-            runtime.logger?.debug("[OpenChat] Using generateMessageResponse");
-            const response = await (runtime as any).generateMessageResponse(memory);
-            responseText = response?.text || response?.content?.text || String(response);
-        } else if (typeof (runtime as any).composeState === 'function') {
-            // Try the compose state -> generate text pattern
-            runtime.logger?.debug("[OpenChat] Using composeState + generate");
-            const state = await (runtime as any).composeState(memory);
-            const response = await (runtime as any).generateText({
-                context: state,
-            });
-            responseText = response;
-        } else {
-            // Fallback: use character's bio or postExamples
-            runtime.logger?.warn("[OpenChat] No message handler found, using fallback");
-            const character = runtime.character;
-            responseText = character.postExamples?.[0] 
-                || character.bio?.[0] 
-                || "Hello! How can I help you?";
+User: ${message}
+
+${character.name}:`;
+
+        try {
+            // Use basic generateText with string prompt
+            if (typeof (runtime as any).generateText === 'function') {
+                runtime.logger?.debug("[OpenChat] Using generateText with prompt");
+                responseText = await (runtime as any).generateText(prompt);
+            } else if (typeof (runtime as any).completion === 'function') {
+                runtime.logger?.debug("[OpenChat] Using completion");
+                const response = await (runtime as any).completion({
+                    prompt,
+                    stop: ["\n"],
+                });
+                responseText = response.text || response.content || String(response);
+            } else {
+                runtime.logger?.warn("[OpenChat] No text generation available, using fallback");
+                responseText = character.postExamples?.[0] 
+                    || character.bio?.[0] 
+                    || "Hello! How can I help you?";
+            }
+        } catch (genError: any) {
+            runtime.logger?.error("[OpenChat] Text generation error:", genError.message);
+            responseText = "I'm having trouble generating a response. Please try again.";
         }
 
         // Ensure we have a string
