@@ -23,73 +23,56 @@ export const sendMessageAction: Action = {
     examples: [
         [
             {
-                user: "user",
                 content: {
                     text: "Send a message to the OpenChat group saying hello",
                 },
-            },
+            } as any,
             {
-                user: "assistant",
                 content: {
                     text: "I'll send that message to OpenChat.",
                     action: "SEND_OPENCHAT_MESSAGE",
                 },
-            },
-        ],
-        [
-            {
-                user: "user",
-                content: {
-                    text: "Post an update on OpenChat about the new features",
-                },
-            },
-            {
-                user: "assistant",
-                content: {
-                    text: "I'll post that update to OpenChat.",
-                    action: "SEND_OPENCHAT_MESSAGE",
-                },
-            },
+            } as any,
         ],
     ],
 
-    validate: async (runtime: IAgentRuntime, message: Memory): Promise<boolean> => {
-        // Check if OpenChat service is available
-        const service = runtime.getService(
-            "openchat"
-        ) as OpenChatClientService | undefined;
+    validate: async (runtime: IAgentRuntime, message: Memory) => {
+        try {
+            // Check if OpenChat service is available
+            const service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
 
-        if (!service) {
+            if (!service) {
+                return false;
+            }
+
+            // Validate that we have at least one installation
+            return service.getInstallations().size > 0;
+        } catch {
             return false;
         }
-
-        // Validate that we have at least one installation
-        return service.getInstallations().size > 0;
     },
 
     handler: async (
         runtime: IAgentRuntime,
         message: Memory,
-        state: State,
-        options: any,
+        state?: State,
+        options?: any,
         callback?: HandlerCallback
-    ): Promise<boolean> => {
+    ) => {
         try {
-            const service = runtime.getService(
-                "openchat"
-            ) as OpenChatClientService;
+            const service = (runtime as any).getService("openchat") as OpenChatClientService;
 
             if (!service) {
-                runtime.logger.error("[OpenChat] Service not available");
-                return false;
+                runtime.logger?.error("[OpenChat] Service not available");
+                return;
             }
 
             // Extract message text
             const messageText = message.content.text;
 
             if (!messageText) {
-                runtime.logger.error("[OpenChat] No message text provided");
-                return false;
+                runtime.logger?.error("[OpenChat] No message text provided");
+                return;
             }
 
             // Get target scope from options or use first installation
@@ -114,8 +97,8 @@ export const sendMessageAction: Action = {
             }
 
             if (!targetScope) {
-                runtime.logger.error("[OpenChat] No target scope available");
-                return false;
+                runtime.logger?.error("[OpenChat] No target scope available");
+                return;
             }
 
             // Create client for scope
@@ -126,11 +109,14 @@ export const sendMessageAction: Action = {
             );
 
             // Send message
-            await client.sendTextMessage(messageText);
+            const msg = await client.createTextMessage(messageText);
+            await client.sendMessage(msg);
 
-            runtime.logger.success(
-                `[OpenChat] Message sent to ${targetScope.kind}: ${targetScope.chatId}`
-            );
+            if (runtime.logger?.success) {
+                runtime.logger.success(
+                    `[OpenChat] Message sent to ${targetScope.kind}: ${targetScope.chatId}`
+                );
+            }
 
             if (callback) {
                 callback({
@@ -138,17 +124,14 @@ export const sendMessageAction: Action = {
                     content: { success: true },
                 });
             }
-
-            return true;
-        } catch (error) {
-            runtime.logger.error("[OpenChat] Error sending message:", error);
+        } catch (error: any) {
+            runtime.logger?.error("[OpenChat] Error sending message:", error?.message || error);
             if (callback) {
                 callback({
-                    text: `Failed to send message to OpenChat: ${error.message}`,
-                    content: { error: error.message },
+                    text: `Failed to send message to OpenChat: ${error?.message || "Unknown error"}`,
+                    content: { error: error?.message || "Unknown error" },
                 });
             }
-            return false;
         }
     },
 };

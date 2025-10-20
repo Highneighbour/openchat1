@@ -34,7 +34,6 @@ import { providers } from "./providers/index.js";
 export const openchatPlugin: Plugin = {
     name: "openchat",
     description: "OpenChat integration for ElizaOS agents",
-    version: "0.1.0",
     
     actions,
     providers,
@@ -44,8 +43,8 @@ export const openchatPlugin: Plugin = {
     /**
      * Initialize the OpenChat plugin
      */
-    init: async (runtime: IAgentRuntime) => {
-        runtime.logger.info("Initializing OpenChat plugin...");
+    init: async (_config: Record<string, string>, runtime: IAgentRuntime) => {
+        runtime.logger?.info("Initializing OpenChat plugin...");
 
         // Validate required environment variables
         const requiredEnvVars = [
@@ -68,7 +67,7 @@ export const openchatPlugin: Plugin = {
         }
 
         // Create bot configuration
-        const config: OpenChatBotConfig = {
+        const botConfig: OpenChatBotConfig = {
             identityPrivateKey: runtime.getSetting("OPENCHAT_BOT_IDENTITY_PRIVATE_KEY")!,
             openchatPublicKey: runtime.getSetting("OPENCHAT_PUBLIC_KEY")!,
             icHost: runtime.getSetting("OPENCHAT_IC_HOST")!,
@@ -77,22 +76,24 @@ export const openchatPlugin: Plugin = {
         };
 
         // Initialize OpenChat client service
-        const service = new OpenChatClientService(runtime, config);
+        const service = new OpenChatClientService(runtime, botConfig);
 
         // Register service with runtime
-        runtime.registerService("openchat", service);
+        (runtime as any).registerService?.("openchat", service);
 
         // Start bot server
         await service.start();
 
-        runtime.logger.success("OpenChat plugin initialized successfully!");
-        runtime.logger.info(
+        if (runtime.logger?.success) {
+            runtime.logger.success("OpenChat plugin initialized successfully!");
+        }
+        runtime.logger?.info(
             `\n` +
             `╔════════════════════════════════════════════════════════════╗\n` +
             `║                  OpenChat Bot Ready                       ║\n` +
             `╠════════════════════════════════════════════════════════════╣\n` +
-            `║  Bot server running on port ${config.port}                        ║\n` +
-            `║  Bot definition: http://localhost:${config.port}/bot_definition  ║\n` +
+            `║  Bot server running on port ${botConfig.port}                        ║\n` +
+            `║  Bot definition: http://localhost:${botConfig.port}/bot_definition  ║\n` +
             `║                                                            ║\n` +
             `║  Next steps:                                               ║\n` +
             `║  1. Register bot on OpenChat using /register_bot          ║\n` +
@@ -102,19 +103,6 @@ export const openchatPlugin: Plugin = {
         );
     },
 
-    /**
-     * Cleanup when plugin is stopped
-     */
-    stop: async (runtime: IAgentRuntime) => {
-        runtime.logger.info("Stopping OpenChat plugin...");
-
-        const service = runtime.getService("openchat") as OpenChatClientService | undefined;
-        if (service) {
-            await service.stop();
-        }
-
-        runtime.logger.info("OpenChat plugin stopped");
-    },
 };
 
 // Export types for external use

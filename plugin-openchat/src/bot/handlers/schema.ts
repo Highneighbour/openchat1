@@ -27,13 +27,12 @@ function getBotDefinition(runtime: IAgentRuntime): BotDefinition {
                     "ReadMessages",
                     "ReadChatSummary",
                     "DeleteMessages",
-                    "SendMessages",
                 ],
             }),
         },
         default_subscriptions: {
             community: [],
-            chat: ["Message", "MemberJoined", "MemberLeft"],
+            chat: ["Message", "MembersJoined", "MembersLeft"],
         },
         commands: [
             {
@@ -43,7 +42,7 @@ function getBotDefinition(runtime: IAgentRuntime): BotDefinition {
                 permissions: Permissions.encodePermissions({
                     ...emptyPermissions,
                     message: ["Text"],
-                    chat: ["ReadChatSummary", "SendMessages"],
+                    chat: ["ReadChatSummary"],
                 }),
                 direct_messages: true,
                 params: [
@@ -98,8 +97,8 @@ export function schemaHandler(_: Request, res: Response, runtime: IAgentRuntime)
     try {
         const definition = getBotDefinition(runtime);
         res.status(200).json(definition);
-    } catch (error) {
-        runtime.logger.error("Error generating bot definition:", error);
+    } catch (error: any) {
+        runtime.logger?.error("Error generating bot definition:", error?.message || error);
         res.status(500).json({ error: "Failed to generate bot definition" });
     }
 }

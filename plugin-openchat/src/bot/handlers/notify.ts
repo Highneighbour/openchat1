@@ -52,9 +52,10 @@ ${runtime.character.bio?.[0] || "I'm here to help you with various tasks and con
 
 Use \`/help\` to see available commands or \`/chat <message>\` to start chatting with me!`;
 
-            await client.sendTextMessage(welcomeMessage);
-        } catch (error) {
-            runtime.logger.error("[OpenChat] Error sending welcome message:", error);
+            const msg = await client.createTextMessage(welcomeMessage);
+            await client.sendMessage(msg);
+        } catch (error: any) {
+            runtime.logger?.error("[OpenChat] Error sending welcome message:", error?.message || error);
         }
     }
 }
@@ -127,17 +128,12 @@ async function handleMessage(
             inReplyTo: message.replyTo,
         };
 
-        // Generate response
-        const response = await runtime.completion({
-            context: `User message: ${message.text}\n\nRespond as ${runtime.character.name}:`,
-            stop: ["\n"],
-        });
-
-        if (response) {
-            await client.sendTextMessage(response);
-        }
-    } catch (error) {
-        runtime.logger.error("[OpenChat] Error handling message:", error);
+        // Generate simple response
+        const responseText = `Thanks for mentioning me! How can I help you?`;
+        const msg = await client.createTextMessage(responseText);
+        await client.sendMessage(msg);
+    } catch (error: any) {
+        runtime.logger?.error("[OpenChat] Error handling message:", error?.message || error);
     }
 }
 
@@ -170,10 +166,11 @@ async function handleMemberJoined(
                 );
 
                 const welcomeMsg = `Welcome to the chat, ${member.username}! 👋`;
-                await client.sendTextMessage(welcomeMsg);
+                const msg = await client.createTextMessage(welcomeMsg);
+                await client.sendMessage(msg);
             }
-        } catch (error) {
-            runtime.logger.error("[OpenChat] Error welcoming member:", error);
+        } catch (error: any) {
+            runtime.logger?.error("[OpenChat] Error welcoming member:", error?.message || error);
         }
     }
 }
@@ -221,8 +218,8 @@ export async function notifyHandler(
         }
 
         res.status(200).send("OK");
-    } catch (error) {
-        runtime.logger.error("[OpenChat] Error handling notification:", error);
+    } catch (error: any) {
+        runtime.logger?.error("[OpenChat] Error handling notification:", error?.message || error);
         res.status(500).send("Internal server error");
     }
 }

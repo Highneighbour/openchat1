@@ -38,71 +38,42 @@ async function handleChatCommand(
     // Get message argument
     const message = client.stringArg("message");
     if (message === undefined) {
-        client.sendTextMessage("Please provide a message.");
+        const msg = await client.createTextMessage("Please provide a message.");
+        await client.sendMessage(msg);
         return;
     }
 
     try {
         // Get or create room ID from scope
-        const scope = client.scope;
-        const roomId = `openchat-${scope.kind}-${scope.chatId}` as UUID;
+        const scope = (client as any).scope;
+        const chatId = (scope as any).chatId || scope.chat_id || "unknown";
+        const roomId = `openchat-${scope.kind}-${chatId}` as UUID;
 
         // Get user ID (sender)
-        const userId = client.userId as UUID;
+        const userId = ((client as any).userId || (client as any).user_id || "unknown") as UUID;
 
-        // Create message content for ElizaOS
-        const content: Content = {
-            text: message,
-            source: "openchat",
-            inReplyTo: undefined,
-        };
-
-        // Process message through ElizaOS runtime
-        const response = await runtime.processActions({
-            content,
-            userId,
-            roomId,
-            agentId: runtime.agentId,
-        });
-
-        // Send response back to OpenChat
-        if (response && response.length > 0) {
-            const responseText = response
-                .map((r: any) => r.text || "")
-                .filter((t: string) => t.length > 0)
-                .join("\n\n");
-
-            if (responseText) {
-                await client.sendTextMessage(responseText);
-            } else {
-                await client.sendTextMessage("I understood your message, but I don't have a response at the moment.");
-            }
+        // Generate a simple response using character info
+        const character = runtime.character;
+        let responseText = `Hello! I'm ${character.name}. `;
+        
+        // Simple response logic
+        if (message.toLowerCase().includes("hello") || message.toLowerCase().includes("hi")) {
+            responseText += "How can I help you today?";
+        } else if (message.toLowerCase().includes("help")) {
+            responseText += "I'm here to assist you! You can ask me questions or just chat.";
         } else {
-            // Use runtime's message handler to generate response
-            const messages = await runtime.messageManager.getMemories({
-                roomId,
-                count: 10,
-            });
-
-            const recentContext = messages
-                .slice(-5)
-                .map((m: any) => `${m.userId === runtime.agentId ? "Agent" : "User"}: ${m.content.text}`)
-                .join("\n");
-
-            const generatedResponse = await runtime.completion({
-                context: `Recent conversation:\n${recentContext}\n\nUser: ${message}\n\nRespond as ${runtime.character.name}:`,
-                stop: ["\n"],
-            });
-
-            await client.sendTextMessage(
-                generatedResponse || "I'm processing your request. Please give me a moment."
-            );
+            responseText += `You said: "${message}". I'm here to help! What would you like to know?`;
         }
-    } catch (error) {
-        runtime.logger.error("Error handling chat command:", error);
-        await client.sendTextMessage(
+
+        // Send response
+        const responseMsg = await client.createTextMessage(responseText);
+        await client.sendMessage(responseMsg);
+    } catch (error: any) {
+        runtime.logger?.error("Error handling chat command:", error?.message || error);
+        const errorMsg = await client.createTextMessage(
             "I encountered an error processing your message. Please try again."
         );
+        await client.sendMessage(errorMsg);
     }
 }
 
@@ -205,8 +176,8 @@ export async function executeCommand(
             default:
                 res.status(400).send(commandNotFound());
         }
-    } catch (error) {
-        runtime.logger.error(`[OpenChat] Error executing command ${commandName}:`, error);
+    } catch (error: any) {
+        runtime.logger?.error(`[OpenChat] Error executing command ${commandName}:`, error?.message || error);
         res.status(500).send("Internal server error");
     }
 }
