@@ -1,7 +1,8 @@
-import { commandNotFound, argumentsInvalid } from "@open-ic/openchat-botclient-ts";
+import { commandNotFound } from "@open-ic/openchat-botclient-ts";
 import { Request, Response } from "express";
 import { WithBotClient } from "../../types/index.js";
-import { IAgentRuntime } from "@elizaos/core";
+import { IAgentRuntime, Content, UUID, Memory } from "@elizaos/core";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * Type guard to check if request has BotClient
@@ -20,7 +21,7 @@ function success(msg?: any) {
 }
 
 /**
- * Handle chat command - main interaction with ElizaOS agent
+ * Handle chat command - properly integrated with ElizaOS message system
  */
 async function handleChatCommand(
     req: WithBotClient,
@@ -29,92 +30,94 @@ async function handleChatCommand(
 ): Promise<void> {
     const client = req.botClient;
     
-    // Send immediate placeholder to frontend only (don't send to backend)
+    // Send immediate placeholder to frontend only
     const placeholder = (await client.createTextMessage("Thinking...")).setFinalised(false);
     res.status(200).json(success(placeholder));
 
     // Get message argument
     const message = client.stringArg("message");
     if (message === undefined) {
-        runtime.logger?.debug("[OpenChat] No message argument provided");
         const msg = (await client.createTextMessage("Please provide a message.")).setFinalised(true);
         await client.sendMessage(msg);
         return;
     }
     
-    runtime.logger?.debug("[OpenChat] Processing message:", message);
-
     try {
-        // Generate response using ElizaOS
-        const character = runtime.character;
-        
-        // Build prompt for the AI
-        const prompt = `You are ${character.name}. ${character.bio?.[0] || ""}
+        // Get scope and user info
+        const scope = (client as any).scope;
+        const chatId = (scope as any).chatId || scope.chat_id || "unknown";
+        const roomId = `openchat-${scope.kind}-${chatId}` as UUID;
+        const userId = ((client as any).initiator || (client as any).userId || "user") as UUID;
 
-${character.style?.all?.join(", ") || "Be helpful and friendly."}
+        runtime.logger?.debug("[OpenChat] Message from", userId, "in room", roomId);
 
-User: ${message}
+        // Create proper content object for ElizaOS
+        const content: Content = {
+            text: message,
+            source: "openchat",
+        };
 
-${character.name}:`;
+        // Create memory-like object for ElizaOS runtime
+        const memory: any = {
+            id: uuidv4() as UUID,
+            userId,
+            agentId: runtime.agentId,
+            roomId,
+            content,
+            createdAt: Date.now(),
+        };
 
+        // Let ElizaOS handle the message through its proper pipeline
         let responseText: string;
-        
-        try {
-            // Try different runtime methods to generate response
-            if (typeof (runtime as any).generateText === 'function') {
-                // generateText expects a string directly, not an object
-                runtime.logger?.debug("[OpenChat] Using generateText method");
-                responseText = await (runtime as any).generateText(prompt);
-            } else if (typeof (runtime as any).completion === 'function') {
-                // completion expects context property
-                runtime.logger?.debug("[OpenChat] Using completion method");
-                const result = await (runtime as any).completion({
-                    context: prompt,
-                    stop: ["\nUser:", `\n${character.name}:`],
-                });
-                responseText = typeof result === 'string' ? result : result?.text || String(result);
-            } else if (typeof (runtime as any).generateResponse === 'function') {
-                runtime.logger?.debug("[OpenChat] Using generateResponse method");
-                const response = await (runtime as any).generateResponse({
-                    text: message,
-                    context: prompt,
-                });
-                responseText = response?.text || String(response);
+
+        // Try to use the proper message handling system
+        if (typeof (runtime as any).handleMessage === 'function') {
+            runtime.logger?.debug("[OpenChat] Using handleMessage");
+            const response = await (runtime as any).handleMessage(memory);
+            responseText = response?.text || response?.content?.text || String(response);
+        } else if (typeof (runtime as any).processMessage === 'function') {
+            runtime.logger?.debug("[OpenChat] Using processMessage");
+            const response = await (runtime as any).processMessage(memory);
+            responseText = response?.text || response?.content?.text || String(response);
+        } else if (typeof (runtime as any).generateMessageResponse === 'function') {
+            runtime.logger?.debug("[OpenChat] Using generateMessageResponse");
+            const response = await (runtime as any).generateMessageResponse(memory);
+            responseText = response?.text || response?.content?.text || String(response);
+        } else if (typeof (runtime as any).composeState === 'function') {
+            // Try the compose state -> generate text pattern
+            runtime.logger?.debug("[OpenChat] Using composeState + generate");
+            const state = await (runtime as any).composeState(memory);
+            const response = await (runtime as any).generateText({
+                context: state,
+            });
+            responseText = response;
+        } else {
+            // Fallback: use character's bio or postExamples
+            runtime.logger?.warn("[OpenChat] No message handler found, using fallback");
+            const character = runtime.character;
+            responseText = character.postExamples?.[0] 
+                || character.bio?.[0] 
+                || "Hello! How can I help you?";
+        }
+
+        // Ensure we have a string
+        if (typeof responseText !== 'string') {
+            runtime.logger?.warn("[OpenChat] Response not a string:", typeof responseText);
+            // Try to extract text from object
+            if (responseText && typeof responseText === 'object') {
+                responseText = (responseText as any).text 
+                    || (responseText as any).content?.text 
+                    || JSON.stringify(responseText);
             } else {
-                // Last resort: use character postExamples or bio
-                runtime.logger?.debug("[OpenChat] No AI method available, using fallback");
-                const examples = character.postExamples || [];
-                responseText = examples.length > 0 
-                    ? examples[Math.floor(Math.random() * examples.length)]
-                    : `${character.bio?.[0] || "Hello! How can I help you?"}`;
-            }
-            
-            // Ensure we have a string
-            if (typeof responseText !== 'string') {
-                runtime.logger?.warn("[OpenChat] Response not a string, converting");
                 responseText = String(responseText || "I'm here to help!");
             }
-        } catch (genError: any) {
-            runtime.logger?.error("[OpenChat] Error generating response:", genError?.message || String(genError));
-            
-            // Fallback response
-            responseText = character.postExamples?.[ 0] 
-                || character.bio?.[0] 
-                || "I'm here to help! What would you like to know?";
         }
 
         responseText = responseText.trim();
         
-        // Clean up response (remove any role prefixes)
-        responseText = responseText
-            .replace(new RegExp(`^${character.name}:\\s*`, 'i'), '')
-            .replace(/^Assistant:\s*/i, '')
-            .replace(/^AI:\s*/i, '')
-            .trim();
-        
-        runtime.logger?.debug("[OpenChat] Generated response:", responseText.substring(0, 100));
+        runtime.logger?.debug("[OpenChat] Final response:", responseText.substring(0, 100));
 
-        // Send final response to OpenChat
+        // Send response to OpenChat
         const responseMsg = (await client.createTextMessage(responseText)).setFinalised(true);
         await client.sendMessage(responseMsg);
         runtime.logger?.debug("[OpenChat] ✅ Response sent successfully");
