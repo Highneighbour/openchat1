@@ -62,31 +62,40 @@ ${character.name}:`;
         try {
             // Try different runtime methods to generate response
             if (typeof (runtime as any).generateText === 'function') {
-                responseText = await (runtime as any).generateText({
-                    prompt,
-                    stop: ["\nUser:", `\n${character.name}:`],
-                    maxTokens: 200,
-                });
+                // generateText expects a string directly, not an object
+                runtime.logger?.debug("[OpenChat] Using generateText method");
+                responseText = await (runtime as any).generateText(prompt);
             } else if (typeof (runtime as any).completion === 'function') {
-                responseText = await (runtime as any).completion({
-                    prompt,
+                // completion expects context property
+                runtime.logger?.debug("[OpenChat] Using completion method");
+                const result = await (runtime as any).completion({
+                    context: prompt,
                     stop: ["\nUser:", `\n${character.name}:`],
                 });
+                responseText = typeof result === 'string' ? result : result?.text || String(result);
             } else if (typeof (runtime as any).generateResponse === 'function') {
+                runtime.logger?.debug("[OpenChat] Using generateResponse method");
                 const response = await (runtime as any).generateResponse({
                     text: message,
                     context: prompt,
                 });
-                responseText = response?.text || response;
+                responseText = response?.text || String(response);
             } else {
                 // Last resort: use character postExamples or bio
+                runtime.logger?.debug("[OpenChat] No AI method available, using fallback");
                 const examples = character.postExamples || [];
                 responseText = examples.length > 0 
                     ? examples[Math.floor(Math.random() * examples.length)]
                     : `${character.bio?.[0] || "Hello! How can I help you?"}`;
             }
+            
+            // Ensure we have a string
+            if (typeof responseText !== 'string') {
+                runtime.logger?.warn("[OpenChat] Response not a string, converting");
+                responseText = String(responseText || "I'm here to help!");
+            }
         } catch (genError: any) {
-            runtime.logger?.error("[OpenChat] Error generating response:", genError?.message || genError);
+            runtime.logger?.error("[OpenChat] Error generating response:", genError?.message || String(genError));
             
             // Fallback response
             responseText = character.postExamples?.[ 0] 
