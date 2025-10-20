@@ -37,10 +37,14 @@ async function handleChatCommand(
     // Get message argument
     const message = client.stringArg("message");
     if (message === undefined) {
+        runtime.logger?.debug("[OpenChat] No message argument provided");
         const msg = (await client.createTextMessage("Please provide a message.")).setFinalised(true);
+        runtime.logger?.debug("[OpenChat] Sending error message to backend...");
         await client.sendMessage(msg);
         return;
     }
+    
+    runtime.logger?.debug("[OpenChat] Processing message:", message);
 
     try {
         // Get or create room ID from scope
@@ -65,8 +69,22 @@ async function handleChatCommand(
         }
 
         // Send final response (must be finalized)
+        runtime.logger?.debug("[OpenChat] Creating final message, text:", responseText.substring(0, 100));
         const responseMsg = (await client.createTextMessage(responseText)).setFinalised(true);
-        await client.sendMessage(responseMsg);
+        
+        // Log the message structure before sending
+        const msgResponse = (responseMsg as any).toResponse ? (responseMsg as any).toResponse() : responseMsg;
+        runtime.logger?.debug("[OpenChat] Message to send:", JSON.stringify(msgResponse, null, 2));
+        
+        runtime.logger?.debug("[OpenChat] Calling client.sendMessage...");
+        try {
+            const result = await client.sendMessage(responseMsg);
+            runtime.logger?.debug("[OpenChat] ✅ Message sent successfully!", JSON.stringify(result, null, 2));
+        } catch (sendError: any) {
+            runtime.logger?.error("[OpenChat] ❌ sendMessage FAILED:", JSON.stringify(sendError, null, 2));
+            runtime.logger?.error("[OpenChat] Error details - kind:", sendError?.kind, "code:", sendError?.code, "message:", sendError?.message);
+            throw sendError;
+        }
     } catch (error: any) {
         runtime.logger?.error("Error handling chat command:", error?.message || error);
         try {
