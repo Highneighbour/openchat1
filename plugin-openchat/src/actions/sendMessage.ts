@@ -108,8 +108,8 @@ export const sendMessageAction: Action = {
                 permissions
             );
 
-            // Send message
-            const msg = await client.createTextMessage(messageText);
+            // Send message (must be finalized)
+            const msg = (await client.createTextMessage(messageText)).setFinalised(true);
             await client.sendMessage(msg);
 
             if (runtime.logger?.success) {

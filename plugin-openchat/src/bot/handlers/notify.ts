@@ -52,7 +52,7 @@ ${runtime.character.bio?.[0] || "I'm here to help you with various tasks and con
 
 Use \`/help\` to see available commands or \`/chat <message>\` to start chatting with me!`;
 
-            const msg = await client.createTextMessage(welcomeMessage);
+            const msg = (await client.createTextMessage(welcomeMessage)).setFinalised(true);
             await client.sendMessage(msg);
         } catch (error: any) {
             runtime.logger?.error("[OpenChat] Error sending welcome message:", error?.message || error);
@@ -130,7 +130,7 @@ async function handleMessage(
 
         // Generate simple response
         const responseText = `Thanks for mentioning me! How can I help you?`;
-        const msg = await client.createTextMessage(responseText);
+        const msg = (await client.createTextMessage(responseText)).setFinalised(true);
         await client.sendMessage(msg);
     } catch (error: any) {
         runtime.logger?.error("[OpenChat] Error handling message:", error?.message || error);
@@ -166,7 +166,7 @@ async function handleMemberJoined(
                 );
 
                 const welcomeMsg = `Welcome to the chat, ${member.username}! 👋`;
-                const msg = await client.createTextMessage(welcomeMsg);
+                const msg = (await client.createTextMessage(welcomeMsg)).setFinalised(true);
                 await client.sendMessage(msg);
             }
         } catch (error: any) {

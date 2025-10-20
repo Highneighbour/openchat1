@@ -31,14 +31,16 @@ async function handleChatCommand(
     const client = req.botClient;
     
     // Send immediate placeholder
-    const placeholder = await client.createTextMessage("Thinking...");
-    placeholder.setFinalised(false);
+    const placeholder = (await client.createTextMessage("Thinking...")).setFinalised(false);
     res.status(200).json(success(placeholder));
+    
+    // Send placeholder to OpenChat backend
+    await client.sendMessage(placeholder);
 
     // Get message argument
     const message = client.stringArg("message");
     if (message === undefined) {
-        const msg = await client.createTextMessage("Please provide a message.");
+        const msg = (await client.createTextMessage("Please provide a message.")).setFinalised(true);
         await client.sendMessage(msg);
         return;
     }
@@ -65,15 +67,19 @@ async function handleChatCommand(
             responseText += `You said: "${message}". I'm here to help! What would you like to know?`;
         }
 
-        // Send response
-        const responseMsg = await client.createTextMessage(responseText);
+        // Send final response (must be finalized)
+        const responseMsg = (await client.createTextMessage(responseText)).setFinalised(true);
         await client.sendMessage(responseMsg);
     } catch (error: any) {
         runtime.logger?.error("Error handling chat command:", error?.message || error);
-        const errorMsg = await client.createTextMessage(
-            "I encountered an error processing your message. Please try again."
-        );
-        await client.sendMessage(errorMsg);
+        try {
+            const errorMsg = (await client.createTextMessage(
+                "I encountered an error processing your message. Please try again."
+            )).setFinalised(true);
+            await client.sendMessage(errorMsg);
+        } catch (sendError: any) {
+            runtime.logger?.error("Failed to send error message:", sendError);
+        }
     }
 }
 
@@ -101,7 +107,7 @@ ${character.bio?.[0] || "I'm an AI agent powered by ElizaOS"}
 **How to Use:**
 Simply use the /chat command followed by your message, or send me a direct message!`;
 
-    const message = await client.createTextMessage(helpText);
+    const message = (await client.createTextMessage(helpText)).setFinalised(true);
     res.status(200).json(success(message));
     await client.sendMessage(message);
 }
@@ -136,7 +142,7 @@ ${character.bio?.[0] || "I'm an AI agent powered by ElizaOS"}
 
 Powered by ElizaOS 🚀`;
 
-    const message = await client.createTextMessage(infoText);
+    const message = (await client.createTextMessage(infoText)).setFinalised(true);
     res.status(200).json(success(message));
     await client.sendMessage(message);
 }
