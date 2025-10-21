@@ -116,7 +116,7 @@ export class OpenChatClientService {
         permissions: string[]
     ): BotClient {
         return this.factory.createClientInAutonomouseContext(
-            scope,
+            scope as any,
             apiGatewayUrl,
             permissions as any
         );
@@ -145,4 +145,3 @@ export class OpenChatClientService {
 }
 
 export default OpenChatClientService;
-Service;
