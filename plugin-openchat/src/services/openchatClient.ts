@@ -1,4 +1,4 @@
-import { IAgentRuntime } from "@elizaos/core";
+import { IAgentRuntime, Service } from "@elizaos/core";
 import { BotClientFactory, BotClient } from "@open-ic/openchat-botclient-ts";
 import express, { Express, Request, Response } from "express";
 import cors from "cors";
@@ -18,6 +18,8 @@ import { schemaHandler } from "../bot/handlers/schema.js";
  * Manages the OpenChat bot server and integration with ElizaOS runtime
  */
 export class OpenChatClientService {
+    static serviceType = "openchat";
+    
     private runtime: IAgentRuntime;
     private factory: BotClientFactory;
     private app: Express;

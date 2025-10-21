@@ -78,8 +78,22 @@ export const openchatPlugin: Plugin = {
         // Initialize OpenChat client service
         const service = new OpenChatClientService(runtime, botConfig);
 
-        // Register service with runtime
-        (runtime as any).registerService?.("openchat", service);
+        // Register service with runtime using multiple methods for compatibility
+        if (typeof (runtime as any).registerService === 'function') {
+            (runtime as any).registerService("openchat", service);
+            runtime.logger?.debug("[OpenChat] Service registered via registerService");
+        }
+        
+        // Also try setting directly on runtime
+        if (!(runtime as any).services) {
+            (runtime as any).services = new Map();
+        }
+        (runtime as any).services.set("openchat", service);
+        runtime.logger?.debug("[OpenChat] Service set in runtime.services Map");
+        
+        // Store in a global variable as fallback
+        (globalThis as any).__openchatService = service;
+        runtime.logger?.debug("[OpenChat] Service stored in global fallback");
 
         // Start bot server
         await service.start();

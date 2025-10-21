@@ -38,17 +38,23 @@ export const sendMessageAction: Action = {
 
     validate: async (runtime: IAgentRuntime, message: Memory) => {
         try {
-            // Check if OpenChat service is available
-            const service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
+            // Try multiple methods to get the service
+            let service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
+            
+            if (!service && (runtime as any).services) {
+                service = (runtime as any).services.get("openchat");
+            }
+            
+            if (!service) {
+                service = (globalThis as any).__openchatService;
+            }
 
             if (!service) {
-                runtime.logger?.debug("[OpenChat Action] Service not found");
+                runtime.logger?.debug("[OpenChat Action] Service not found via any method");
                 return false;
             }
 
-            // Validate that we have at least one installation
-            const hasInstallations = service.getInstallations().size > 0;
-            runtime.logger?.debug(`[OpenChat Action] Has installations: ${hasInstallations}, count: ${service.getInstallations().size}`);
+            runtime.logger?.debug("[OpenChat Action] Service found!");
             
             // Always return true if service exists (installations may be added later)
             return true;
@@ -67,7 +73,19 @@ export const sendMessageAction: Action = {
     ) => {
         try {
             runtime.logger?.info("[OpenChat Action] Handler invoked");
-            const service = (runtime as any).getService("openchat") as OpenChatClientService;
+            
+            // Try multiple methods to get the service
+            let service = (runtime as any).getService?.("openchat") as OpenChatClientService;
+            
+            if (!service && (runtime as any).services) {
+                service = (runtime as any).services.get("openchat");
+                runtime.logger?.debug("[OpenChat] Got service from runtime.services Map");
+            }
+            
+            if (!service) {
+                service = (globalThis as any).__openchatService;
+                runtime.logger?.debug("[OpenChat] Got service from global fallback");
+            }
 
             if (!service) {
                 const errorMsg = "OpenChat service not available. Make sure the plugin is properly initialized.";
