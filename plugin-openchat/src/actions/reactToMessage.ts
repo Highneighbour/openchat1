@@ -8,7 +8,8 @@ import {
 import { OpenChatClientService } from "../services/openchatClient.js";
 
 /**
- * Action to react to a message on OpenChat
+ * REACT_TO_OPENCHAT_MESSAGE Action
+ * Reacts to messages with emoji reactions
  */
 export const reactToMessageAction: Action = {
     name: "REACT_TO_OPENCHAT_MESSAGE",
@@ -16,7 +17,7 @@ export const reactToMessageAction: Action = {
     similes: [
         "ADD_REACTION_OPENCHAT",
         "REACT_OPENCHAT",
-        "EMOJI_REACT_OPENCHAT",
+        "EMOJI_REACT",
     ],
     examples: [
         [
@@ -27,7 +28,7 @@ export const reactToMessageAction: Action = {
             } as any,
             {
                 content: {
-                    text: "I'll react with 👍",
+                    text: "I'll add that reaction",
                     action: "REACT_TO_OPENCHAT_MESSAGE",
                 },
             } as any,
@@ -36,15 +37,23 @@ export const reactToMessageAction: Action = {
 
     validate: async (runtime: IAgentRuntime, message: Memory) => {
         try {
-            const service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
+            let service = (runtime as any).getService?.("openchat") as OpenChatClientService;
+            if (!service && (runtime as any).services) {
+                service = (runtime as any).services.get("openchat");
+            }
+            if (!service) {
+                service = (globalThis as any).__openchatService;
+            }
+
             if (!service) return false;
-            
+
             // Check if any installation has ReactToMessages permission
             for (const installation of service.getInstallations().values()) {
-                if (installation.permissions.includes("ReactToMessages")) {
+                if (installation.permissions?.includes("ReactToMessages")) {
                     return true;
                 }
             }
+            
             return false;
         } catch {
             return false;
@@ -59,58 +68,97 @@ export const reactToMessageAction: Action = {
         callback?: HandlerCallback
     ) => {
         try {
-            const service = (runtime as any).getService("openchat") as OpenChatClientService;
+            let service = (runtime as any).getService?.("openchat") as OpenChatClientService;
+            if (!service && (runtime as any).services) {
+                service = (runtime as any).services.get("openchat");
+            }
+            if (!service) {
+                service = (globalThis as any).__openchatService;
+            }
+
             if (!service) {
                 runtime.logger?.error("[OpenChat] Service not available");
+                if (callback) {
+                    callback({
+                        text: "OpenChat service not available",
+                        content: { error: "Service not found" },
+                    });
+                }
                 return;
             }
 
-            // Get emoji from options or default to 👍
-            const emoji = options?.emoji || "👍";
-            const messageId = options?.messageId;
-
-            if (!messageId) {
-                runtime.logger?.error("[OpenChat] No messageId provided for reaction");
-                return;
-            }
-
-            // Get first installation with react permission
+            // Find installation with ReactToMessages permission
             let targetInstallation;
             for (const installation of service.getInstallations().values()) {
-                if (installation.permissions.includes("ReactToMessages")) {
+                if (installation.permissions?.includes("ReactToMessages")) {
                     targetInstallation = installation;
                     break;
                 }
             }
 
             if (!targetInstallation) {
-                runtime.logger?.error("[OpenChat] No installation with ReactToMessages permission");
+                runtime.logger?.error("[OpenChat] No ReactToMessages permission");
+                if (callback) {
+                    callback({
+                        text: "Bot doesn't have permission to react to messages",
+                        content: { error: "No ReactToMessages permission" },
+                    });
+                }
                 return;
             }
 
+            const { scope, permissions } = targetInstallation;
+            const emoji = options?.emoji || "👍";
+            const messageId = options?.messageId;
+
+            if (!messageId) {
+                runtime.logger?.error("[OpenChat] No messageId provided");
+                if (callback) {
+                    callback({
+                        text: "Message ID required to react",
+                        content: { error: "No messageId" },
+                    });
+                }
+                return;
+            }
+
+            runtime.logger?.info(`[OpenChat] Reacting with ${emoji}...`);
+
+            // Create client for autonomous context
             const client = service.createClientForScope(
-                targetInstallation.scope,
-                runtime.getSetting("OPENCHAT_IC_HOST") || "",
-                targetInstallation.permissions
+                scope,
+                (targetInstallation as any).apiGateway || runtime.getSetting("OPENCHAT_IC_HOST") || "",
+                permissions
             );
 
-            // React to message
-            await (client as any).reactToMessage(messageId, emoji);
+            // Add reaction
+            const result = await (client as any).addReaction?.(messageId, emoji);
 
-            runtime.logger?.success?.(`[OpenChat] Reacted to message with ${emoji}`);
+            if (result && result.kind !== "success") {
+                runtime.logger?.error("[OpenChat] Reaction failed:", result);
+                if (callback) {
+                    callback({
+                        text: "Failed to add reaction",
+                        content: { error: "Reaction failed" },
+                    });
+                }
+                return;
+            }
+
+            runtime.logger?.info(`[OpenChat] ✅ Reacted with ${emoji}`);
 
             if (callback) {
                 callback({
-                    text: `Reacted with ${emoji}`,
-                    content: { success: true },
+                    text: `Added ${emoji} reaction`,
+                    content: { success: true, emoji },
                 });
             }
         } catch (error: any) {
-            runtime.logger?.error("[OpenChat] Error reacting to message:", error?.message || error);
+            runtime.logger?.error("[OpenChat] Error reacting:", error);
             if (callback) {
                 callback({
-                    text: `Failed to react: ${error?.message || "Unknown error"}`,
-                    content: { error: error?.message || "Unknown error" },
+                    text: `Error adding reaction: ${error.message}`,
+                    content: { error: error.message },
                 });
             }
         }
