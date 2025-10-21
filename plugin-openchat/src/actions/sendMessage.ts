@@ -42,12 +42,18 @@ export const sendMessageAction: Action = {
             const service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
 
             if (!service) {
+                runtime.logger?.debug("[OpenChat Action] Service not found");
                 return false;
             }
 
             // Validate that we have at least one installation
-            return service.getInstallations().size > 0;
-        } catch {
+            const hasInstallations = service.getInstallations().size > 0;
+            runtime.logger?.debug(`[OpenChat Action] Has installations: ${hasInstallations}, count: ${service.getInstallations().size}`);
+            
+            // Always return true if service exists (installations may be added later)
+            return true;
+        } catch (error: any) {
+            runtime.logger?.warn("[OpenChat Action] Validation error:", error.message);
             return false;
         }
     },
@@ -60,20 +66,41 @@ export const sendMessageAction: Action = {
         callback?: HandlerCallback
     ) => {
         try {
+            runtime.logger?.info("[OpenChat Action] Handler invoked");
             const service = (runtime as any).getService("openchat") as OpenChatClientService;
 
             if (!service) {
-                runtime.logger?.error("[OpenChat] Service not available");
+                const errorMsg = "OpenChat service not available. Make sure the plugin is properly initialized.";
+                runtime.logger?.error("[OpenChat]", errorMsg);
+                if (callback) {
+                    callback({
+                        text: errorMsg,
+                        content: { error: errorMsg },
+                    });
+                }
                 return;
             }
 
-            // Extract message text
-            const messageText = message.content.text;
+            runtime.logger?.debug(`[OpenChat] Service found, installations: ${service.getInstallations().size}`);
+
+            // Extract message text from state or message content
+            const messageText = (state as any)?.messageText 
+                || message.content.text 
+                || (message.content as any)?.message;
 
             if (!messageText) {
-                runtime.logger?.error("[OpenChat] No message text provided");
+                const errorMsg = "No message text provided to send to OpenChat";
+                runtime.logger?.error("[OpenChat]", errorMsg);
+                if (callback) {
+                    callback({
+                        text: errorMsg,
+                        content: { error: errorMsg },
+                    });
+                }
                 return;
             }
+
+            runtime.logger?.debug("[OpenChat] Extracted message text:", String(messageText).substring(0, 50));
 
             // Get target scope from options or use first installation
             let targetScope: OpenChatScope | undefined;
@@ -93,11 +120,19 @@ export const sendMessageAction: Action = {
                 if (firstInstallation) {
                     targetScope = firstInstallation.scope;
                     permissions = firstInstallation.permissions;
+                    runtime.logger?.debug("[OpenChat] Using first installation:", targetScope.kind, targetScope.chatId);
                 }
             }
 
             if (!targetScope) {
-                runtime.logger?.error("[OpenChat] No target scope available");
+                const errorMsg = "No OpenChat installations found. Please install the bot in an OpenChat group/channel first.";
+                runtime.logger?.error("[OpenChat]", errorMsg);
+                if (callback) {
+                    callback({
+                        text: errorMsg,
+                        content: { error: errorMsg },
+                    });
+                }
                 return;
             }
 
@@ -108,27 +143,29 @@ export const sendMessageAction: Action = {
                 permissions
             );
 
+            runtime.logger?.info("[OpenChat] Sending message to", targetScope.kind, targetScope.chatId);
+
             // Send message (must be finalized)
             const msg = (await client.createTextMessage(messageText)).setFinalised(true);
             await client.sendMessage(msg);
 
+            const successMsg = `Message sent to OpenChat ${targetScope.kind}`;
             if (runtime.logger?.success) {
-                runtime.logger.success(
-                    `[OpenChat] Message sent to ${targetScope.kind}: ${targetScope.chatId}`
-                );
+                runtime.logger.success(`[OpenChat] ${successMsg}: ${targetScope.chatId}`);
             }
 
             if (callback) {
                 callback({
-                    text: `Message sent to OpenChat ${targetScope.kind}`,
-                    content: { success: true },
+                    text: successMsg,
+                    content: { success: true, targetScope },
                 });
             }
         } catch (error: any) {
+            const errorMsg = `Failed to send message to OpenChat: ${error?.message || "Unknown error"}`;
             runtime.logger?.error("[OpenChat] Error sending message:", error?.message || error);
             if (callback) {
                 callback({
-                    text: `Failed to send message to OpenChat: ${error?.message || "Unknown error"}`,
+                    text: errorMsg,
                     content: { error: error?.message || "Unknown error" },
                 });
             }
