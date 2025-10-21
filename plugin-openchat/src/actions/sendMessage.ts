@@ -6,60 +6,50 @@ import {
     State,
 } from "@elizaos/core";
 import { OpenChatClientService } from "../services/openchatClient.js";
-import { OpenChatScope } from "../types/index.js";
 
 /**
- * Action to send a message to OpenChat
+ * Extract the message content from user's request
  */
+function extractMessageContent(text: string): string | null {
+    const patterns = [
+        /(?:saying|say)\s+["']?([^"'\n]+)["']?/i,
+        /(?:message|post)[:\s]+["']?([^"'\n]+)["']?/i,
+        /["']([^"']+)["']/,
+        /:\s*(.+)$/,
+    ];
+    
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+    }
+    
+    return null;
+}
+
 export const sendMessageAction: Action = {
     name: "SEND_OPENCHAT_MESSAGE",
-    description: "Send a message to an OpenChat group, channel, or direct chat",
-    similes: [
-        "SEND_MESSAGE_TO_OPENCHAT",
-        "POST_TO_OPENCHAT",
-        "MESSAGE_OPENCHAT",
-        "REPLY_ON_OPENCHAT",
-    ],
+    description: "Send a message to OpenChat",
+    similes: ["SEND_MESSAGE_TO_OPENCHAT", "POST_TO_OPENCHAT", "MESSAGE_OPENCHAT"],
     examples: [
         [
-            {
-                content: {
-                    text: "Send a message to the OpenChat group saying hello",
-                },
-            } as any,
-            {
-                content: {
-                    text: "I'll send that message to OpenChat.",
-                    action: "SEND_OPENCHAT_MESSAGE",
-                },
-            } as any,
+            { content: { text: "Send a message saying hello" } } as any,
+            { content: { text: "Sending to OpenChat!", action: "SEND_OPENCHAT_MESSAGE" } } as any,
         ],
     ],
 
     validate: async (runtime: IAgentRuntime, message: Memory) => {
         try {
-            // Try multiple methods to get the service
-            let service = (runtime as any).getService?.("openchat") as OpenChatClientService | undefined;
+            let service = (runtime as any).getService?.("openchat") as OpenChatClientService;
+            if (!service && (runtime as any).services) service = (runtime as any).services.get("openchat");
+            if (!service) service = (globalThis as any).__openchatService;
             
-            if (!service && (runtime as any).services) {
-                service = (runtime as any).services.get("openchat");
-            }
+            if (!service) return false;
             
-            if (!service) {
-                service = (globalThis as any).__openchatService;
-            }
-
-            if (!service) {
-                runtime.logger?.debug("[OpenChat Action] Service not found via any method");
-                return false;
-            }
-
-            runtime.logger?.debug("[OpenChat Action] Service found!");
-            
-            // Always return true if service exists (installations may be added later)
-            return true;
-        } catch (error: any) {
-            runtime.logger?.warn("[OpenChat Action] Validation error:", error.message);
+            const text = (message.content.text || "").toLowerCase();
+            return text.includes("send") || text.includes("post") || text.includes("say");
+        } catch {
             return false;
         }
     },
@@ -71,121 +61,45 @@ export const sendMessageAction: Action = {
         options?: any,
         callback?: HandlerCallback
     ) => {
+        runtime.logger?.info("🚀 [OpenChat] SEND_MESSAGE START");
+        
         try {
-            runtime.logger?.info("[OpenChat Action] Handler invoked");
-            
-            // Try multiple methods to get the service
             let service = (runtime as any).getService?.("openchat") as OpenChatClientService;
-            
-            if (!service && (runtime as any).services) {
-                service = (runtime as any).services.get("openchat");
-                runtime.logger?.debug("[OpenChat] Got service from runtime.services Map");
-            }
-            
-            if (!service) {
-                service = (globalThis as any).__openchatService;
-                runtime.logger?.debug("[OpenChat] Got service from global fallback");
-            }
+            if (!service && (runtime as any).services) service = (runtime as any).services.get("openchat");
+            if (!service) service = (globalThis as any).__openchatService;
 
             if (!service) {
-                const errorMsg = "OpenChat service not available. Make sure the plugin is properly initialized.";
-                runtime.logger?.error("[OpenChat]", errorMsg);
-                if (callback) {
-                    callback({
-                        text: errorMsg,
-                        content: { error: errorMsg },
-                    });
-                }
+                runtime.logger?.error("❌ Service not found");
                 return;
             }
 
-            runtime.logger?.debug(`[OpenChat] Service found, installations: ${service.getInstallations().size}`);
+            const userText = message.content.text || "";
+            const messageToSend = extractMessageContent(userText) || "Hello from ElizaOS!";
+            
+            runtime.logger?.info(`📝 Message: "${messageToSend}"`);
 
-            // Extract message text from state or message content
-            const messageText = (state as any)?.messageText 
-                || message.content.text 
-                || (message.content as any)?.message;
-
-            if (!messageText) {
-                const errorMsg = "No message text provided to send to OpenChat";
-                runtime.logger?.error("[OpenChat]", errorMsg);
-                if (callback) {
-                    callback({
-                        text: errorMsg,
-                        content: { error: errorMsg },
-                    });
-                }
+            const installations = Array.from(service.getInstallations().values());
+            if (installations.length === 0) {
+                runtime.logger?.error("❌ No installations");
                 return;
             }
 
-            runtime.logger?.debug("[OpenChat] Extracted message text:", String(messageText).substring(0, 50));
+            const installation = installations[0];
+            const icHost = runtime.getSetting("OPENCHAT_IC_HOST") || "";
+            const client = service.createClientForScope(installation.scope, icHost, installation.permissions);
 
-            // Get target scope from options or use first installation
-            let targetScope: OpenChatScope | undefined;
-            let permissions: string[] = [];
-
-            if (options?.scope) {
-                targetScope = options.scope;
-                const installation = service
-                    .getInstallations()
-                    .get(`${options.scope.kind}-${options.scope.chatId}`);
-                permissions = installation?.permissions || [];
-            } else {
-                // Use first available installation
-                const firstInstallation = Array.from(
-                    service.getInstallations().values()
-                )[0];
-                if (firstInstallation) {
-                    targetScope = firstInstallation.scope;
-                    permissions = firstInstallation.permissions;
-                    runtime.logger?.debug("[OpenChat] Using first installation:", targetScope.kind, targetScope.chatId);
-                }
-            }
-
-            if (!targetScope) {
-                const errorMsg = "No OpenChat installations found. Please install the bot in an OpenChat group/channel first.";
-                runtime.logger?.error("[OpenChat]", errorMsg);
-                if (callback) {
-                    callback({
-                        text: errorMsg,
-                        content: { error: errorMsg },
-                    });
-                }
-                return;
-            }
-
-            // Create client for scope
-            const client = service.createClientForScope(
-                targetScope,
-                runtime.getSetting("OPENCHAT_IC_HOST") || "",
-                permissions
-            );
-
-            runtime.logger?.info("[OpenChat] Sending message to", targetScope.kind, targetScope.chatId);
-
-            // Send message (must be finalized)
-            const msg = (await client.createTextMessage(messageText)).setFinalised(true);
+            const msg = (await client.createTextMessage(messageToSend)).setFinalised(true);
             await client.sendMessage(msg);
 
-            const successMsg = `Message sent to OpenChat ${targetScope.kind}`;
-            if (runtime.logger?.success) {
-                runtime.logger.success(`[OpenChat] ${successMsg}: ${targetScope.chatId}`);
-            }
+            runtime.logger?.info("✅ Message sent!");
 
             if (callback) {
-                callback({
-                    text: successMsg,
-                    content: { success: true, targetScope },
-                });
+                callback({ text: `Sent: "${messageToSend}"`, content: { success: true } });
             }
         } catch (error: any) {
-            const errorMsg = `Failed to send message to OpenChat: ${error?.message || "Unknown error"}`;
-            runtime.logger?.error("[OpenChat] Error sending message:", error?.message || error);
+            runtime.logger?.error("❌ Error:", error.message);
             if (callback) {
-                callback({
-                    text: errorMsg,
-                    content: { error: error?.message || "Unknown error" },
-                });
+                callback({ text: `Failed: ${error.message}`, content: { error: error.message } });
             }
         }
     },
